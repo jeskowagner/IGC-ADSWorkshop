@@ -18,7 +18,7 @@ We will present some possible challenges during the first workshop on the
 Sources for challenges may be [Kaggle](https://www.kaggle.com/), [DREAM](https://dreamchallenges.org/),
 or any other source that our community would benefit from. 
 
-Simple challenges may deviate from the overall bio-theme to keep them short and approachable, for example the [Titanic challenge](https://www.kaggle.com/competitions/titanic).
+Simple challenges may deviate from the overall bio-theme to keep them short and approachable, for example the [Titanic challenge](https://www.kaggle.com/competitions/titanic) or the more recent [Spaceship Titanic](https://www.kaggle.com/competitions/spaceship-titanic).
 
 Examples for more advanced challenges are: [cell image classification](https://www.kaggle.com/competitions/recursion-cellular-image-classification) and [MOA prediction](https://www.kaggle.com/competitions/lish-moa/overview.)
 If you find any good source please let us [know](##Feedback)!
