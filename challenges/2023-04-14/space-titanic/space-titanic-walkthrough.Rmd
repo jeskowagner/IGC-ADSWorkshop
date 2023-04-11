@@ -1,0 +1,495 @@
+---
+title: "Space Titanic Walkthrough"
+author: "Hugh Warden"
+date: '2023-04-05'
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: "paged"
+    theme: "lumen"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+# Introduction
+
+Here is a walkthrough for training a model on the `Space Titanic` dataset from Kaggle in R. I am going to be using the `tidymodels` framework which is an extension of the tidy suite of packages (most famously `tidyverse`). Just like `tidyverse`, `tidymodels` is actually a collection of packages each of which do different things. I will not be diving into all of the packages here, if you would like to learn more please check out the documentation.
+
+The `Space Titanic` dataset is a new version of the famous `Titanic` data set. The aim is to be able to use various information about passengers to predict whether a person is successfully transported across the galaxy. You can find out more about the individual variables in the data documentation, I won't be going into too much detail about what each variable is so please look over it before you begin.
+
+# Main Content
+
+## Preparing the Data
+
+Firstly, create a new project in R (always use projects when working in R!!), create a new folder to store your data in and download the Space Titanic data from Kaggle into that new directory. The data is already split into two files `train.csv` and `test.csv`. Something different about the data in `test.csv` is that it doesn't contain any ground truth labels and so we won't know whether our predictions are correct or not.
+
+We can start by loading in the data
+
+```{r}
+set.seed(123)
+library(tidyverse)
+
+raw_data <- read_csv("./Data/00_Raw_Data/train.csv")
+
+head(raw_data)
+```
+
+We can use the `skimr` package to get a summary of all the variables in the data set.
+
+```{r}
+library(skimr)
+
+skim(raw_data)
+```
+
+In this data set we are trying to predict the variable `Transported`. It's important to check whether is a class imbalance (check that there are roughly the same number of people transported and not transported).
+
+```{r message = FALSE}
+raw_data %>%
+  group_by(Transported) %>%
+  summarise(
+    Count = n()
+  )
+```
+
+Now we can start looking at transforming our data ready for machine learning. There are two ways of doing this, manually transforming it or creating a data preprocessing object to attach to the model. A data preprocessing object will take the data that you are passing into the model and automatically tranform it into the correct form for the model. This is good because it means you only need to write this proprocessing object once and it will automatically transform any new data you give your model, you can also deploy your model with this preprocessing object attached meaning other people don't have to preprocess their data into the same form before using it, making it easier to share. The downside is that these preprocessing objects can be hard to code, `tidymodels` makes it much easier but it can still be a bit fiddly. In this walkthrough we use a combination of both methods.
+
+The first variable that we are going to tackle is `Cabin` this is made up of the cabin's  deck, number and side of ship all separated by forward slashes. We can convert this one column into three using the `separate` function as shown below.
+
+```{r message = FALSE}
+data_proc <- raw_data %>%
+  separate(
+    Cabin, into = c("Deck", "Num", "Side"), sep = "/"
+  )
+
+data_proc
+```
+
+We can then take all of the non-numeric variables and convert them into the correct form to be read by the model. Firstly, just for ease of interpretibility I take the logical value `Transported` and recode it as `"Transported"` and `"Not Transported"` rather than `TRUE` and `FALSE`. I then convert all of the categorical variables (characters and logicals) into factors (I also convert `Num` into a numeric variable, it wasn't converted before as it contains `NA` values). We don't convert the `PassengerId` and `Name` variables as we aren't going to use these as a part of our model.
+
+```{r message=FALSE}
+data_proc <- data_proc %>%
+  mutate(
+    Transported = ifelse(Transported, "Transported", "Not Transported"),
+    Transported = factor(Transported, levels = c("Transported", "Not Transported")),
+    VIP = factor(VIP),
+    CryoSleep = factor(CryoSleep),
+    HomePlanet = factor(HomePlanet),
+    Deck = factor(Deck),
+    Num = as.numeric(Num),
+    Side = factor(Side),
+    Destination = factor(Destination)
+  )
+
+data_proc
+```
+
+You should spend a **very very very long time** performing exploratory data analysis getting to know your data and thinking about how it will interact with your model. We don't have time to do that here so let's just do a basic look at the numeric variables. Below I select the numeric variables and plot each of their distributions.
+
+```{r}
+data_proc %>%
+  select_if(function(col) is.numeric(col)) %>%
+  pivot_longer(
+    cols = 1:ncol(.),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  ggplot() +
+  aes(
+    x = value
+  ) +
+  geom_histogram() +
+  facet_wrap(
+    ~ variable,
+    scales = "free"
+  ) +
+  scale_y_continuous(
+    trans = scales::log1p_trans()
+  ) +
+  theme_bw()
+```
+
+I then do the same thing but `log1p` transform all of the numeric variables. The `log1p` transform is like the normal `log` function except you add one to the number before logging it. This avoids problems with trying to log 0 which ends in undefined values.
+
+```{r}
+data_proc %>%
+  select_if(function(col) is.numeric(col)) %>%
+  pivot_longer(
+    cols = 1:ncol(.),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  ggplot() +
+  aes(
+    x = value
+  ) +
+  geom_histogram() +
+  facet_wrap(
+    ~ variable,
+    scales = "free"
+  ) +
+  scale_y_continuous(
+    trans = scales::log1p_trans()
+  ) +
+  scale_x_continuous(
+    trans = scales::log1p_trans()
+  ) +
+  theme_bw()
+```
+
+You can see that `Age` and `Num` are more evenly balanced in the original data, but the rest are more evenly balanced in the logged data. Therefore, all numeric variables are logged except `Age` and `Num`.
+
+```{r}
+data_proc <- data_proc %>%
+  mutate(
+    RoomService = log1p(RoomService),
+    FoodCourt = log1p(FoodCourt),
+    ShoppingMall = log1p(FoodCourt),
+    Spa = log1p(Spa),
+    VRDeck = log1p(VRDeck)
+  )
+```
+
+Finally another consideration is whether there are any variables that are correlated with each other. We can do this using the `ggpairs` function from the `GGally` package. 
+
+```{r message=FALSE, warning=FALSE}
+library(GGally)
+data_proc %>%
+  select_if(function(col) is.numeric(col)) %>%
+  ggpairs() +
+  theme_bw()
+```
+
+Here we can see `FoodCourt` and `ShoppingMall` are directly correlated and so one can be removed, increasing the power of the model whilst not losing any predictive power. We also can remove other variables that are not going to be used by the model.
+
+```{r}
+data_proc <- data_proc %>%
+  select(
+    -FoodCourt,
+    -PassengerId,
+    -Name
+  )
+```
+
+We have loaded our training set and we also have a testing set in the `test.csv`. However, our testing data set doesn't have any ground truth values for us to estimate how well our model will perform on unseen data. Due to this, we can create a validation set and use this like a test set to estimate our model's performance. You would use this same code (just naming your variables differently) to do a typical test/train split. We use the `strata = Transported` argument to make the proportion of people Transported the same in the training and validation sets.
+
+```{r}
+library(tidymodels)
+
+data_split <- initial_split(data_proc, strata = Transported)
+data_train <- training(data_split)
+data_val <- testing(data_split)
+```
+
+## Create Data Preprocessor
+
+We can also create a data preprocessor that can be preappended to the model to automatically preprocess the data. `tidymodels` uses a package called `recipes` to do this.
+
+To start we create a recipe we have to give it a data set, in this case we have given it `data_train`. **It is very important the you only give the recipe the training data and not the testing data**, this is to prevent something called data leakage. We also have to give the recipe a formula which tells it what variable we are trying to predict using what other variables. Here we have specified `Transported ~ .` which means we are trying to predict `Transported` using all of the other variables in the data set.
+
+After defining the recipe, we then add steps to tell the preprocessor what operations to perform. The first step I have added is `step_nzv`, this is a pretty standard first step which looks through all of your data and removes any variables that have **n**ear **z**ero **v**ariance. These are variables that don't change that much, if at all, and therefore are unlikely to contain much informtation. As well as saying what step should be performed, we also need to say what variables this step should be performed on, in this case I used the `all_predictors` function which will automatically apply it to every variable we are using to make this prediction. 
+
+I then decided to center and scale all of my variables using `step_center` and `step_scale`, using the selector `all_numeric_predictors` to only apply this step to variables that are numbers. If you have a predictor where all of the values are the same number, then `step_scale` will fail as this variable has zero variance, this is another example why `step_nzv` can be a good idea.
+
+An important part of machine learning is data imputation, or the process of dealing with missing data. There are much better ways to do it than this and it will be different for every data set but here is an example of one method you can perform inside a recipe. `step_impute_knn` will find any point with missing data and will then, by default, find 5 other data points that look the most like it. It will then look at these 5 closest data points, specifically at the value that is missing, and calculate the average. It will then replace the missing data value with this average.
+
+The final step in the recipe I have made is `step_dummy`. What this does is it turns categorical variables into numeric ones. It does this by converting one factor variable into lots of variables, with each factor (except one) being represented in its own column. If the observation is of the category given by the factor then the corresponding column will be a 1 and it will be a 0 otherwise (one factor is left out, if the observation is of this category then all of the columns will be 0). This step was applied to all of the factors being used for prediction using the `all_factor_predictors` selector.
+
+I then use the `prep` and `juice` functions to print out an example of the transformed data. `prep` will fit the preprocessor to your training data set and `juice` will extract the transformed training data (you can transform new data using the `bake` function). After the model is fit each new observation will be processed the same as the training data, i.e. the new observations will be centered and scaled with the mean and variance of the training data, not the new data. Although I use them to show the data here, do not create a variable storing the recipe after `prep` has been called otherwise what we do later won't work.
+
+```{r}
+data_rec <- recipe(Transported ~ ., data = data_train) %>%
+  step_nzv(all_predictors()) %>%
+  step_center(all_numeric_predictors()) %>%
+  step_scale(all_numeric_predictors()) %>%
+  step_impute_knn(all_predictors())  %>%
+  step_dummy(all_factor_predictors())
+
+data_rec %>% prep() %>% juice()
+```
+
+## Train a Model
+
+For this walkthrough I am going to train a very simple linear model. There are many more complicated models that will perform a lot better on this data set and the great thing about `tidymodels` is that you train those models in almost exactly the same way. However, you do need to have some understanding of how those models work in order to get all the settings right, hence why I'm keeping it simple. As this is a classification problem, I am going to be using logistic regression which is a form of linear model that can differentiate between two classes. There is also another extension of linear regression called multinomial regression that can do any number of classes, but we will stick with logistic here.
+
+Firstly, we aren't going to just be creating a model, we are going to be creating a workflow. A workflow is a series of processes that will be applied to your data, one of which is a model. Our workflow is going to have two stages, the data preprocessor we have already created and our logistic regression model. So we create the workflow with the `workflow` function and then add the preprocessor (or recipe) and the model. It is important to remember that when we created our recipe we said what variable we were going to predict and what variables we were going to use to predict. So when we add the recipe that information is made available to the workflow.
+
+```{r message = FALSE, warning=FALSE}
+titanic_workflow <- workflow() %>%
+  add_recipe(data_rec) %>%
+  add_model(logistic_reg())
+```
+
+We can then fit the model using the `fit` function.
+
+```{r}
+titanic_fit <- fit(
+  titanic_workflow,
+  data_train
+)
+```
+
+We can now use this model to start predicting outcomes. Here we predict the ground truth values of 
+
+```{r}
+preds_train <- predict(titanic_fit, data_val)
+
+library(caret)
+confusionMatrix(preds_train$.pred_class, data_val$Transported)
+```
+
+## Test the Model
+
+To create predictions for our test set we can load it into R, perform the same transformations that we performed to our training data and then pass it through our model.
+
+```{r}
+data_test <- read_csv("./Data/00_Raw_Data/test.csv")
+
+data_test_proc <- data_test %>%
+  separate(
+    Cabin, into = c("Deck", "Num", "Side"), sep = "/"
+  ) %>%
+  mutate(
+    VIP = factor(VIP),
+    CryoSleep = factor(CryoSleep),
+    HomePlanet = factor(HomePlanet),
+    Deck = factor(Deck),
+    Num = as.numeric(Num),
+    Side = factor(Side),
+    Destination = factor(Destination)
+  ) %>%
+  mutate(
+    RoomService = log1p(RoomService),
+    FoodCourt = log1p(FoodCourt),
+    ShoppingMall = log1p(FoodCourt),
+    Spa = log1p(Spa),
+    VRDeck = log1p(VRDeck)
+  ) %>%
+  select(
+    -FoodCourt,
+    -PassengerId,
+    -Name
+  )
+
+preds_test <- predict(titanic_fit, data_test_proc)
+head(preds_test$.pred_class, 20)
+```
+
+We can then transform this into a form that can be uploaded to Kaggle.
+
+```{r}
+kaggle_submission <- tibble(
+  PassengerId = data_test$PassengerId,
+  Transported = preds_test$.pred_class
+) %>%
+  mutate(
+    Transported = ifelse(Transported == "Transported", "True", "False")
+  )
+
+kaggle_submission
+```
+
+This can then be saved out to a csv file and uploaded to Kaggle to see how well we did.
+
+```{r}
+write_csv(kaggle_submission, "kaggle_submission.csv")
+```
+
+**CONGRATULATIONS!!** You have now trained a basic machine learning model in R and used it to answer a Kaggle question.
+
+# Extensions
+
+## Variable Importance
+
+Logistic regression is a form of linear regression, this means that each variable has a coefficient that can be used as a measure of variable importance. The bigger the size of the coefficient the more important it is, with positive coefficients meaning an increase in this variable will favor the observation being transported and vice versa (we can only compare these coefficients if the variables are normalised!!! Luckily we have already done this!!).
+
+The coefficients can be extracted from the model using `titanic_fit %>% tidy()` (the `estimate` column is the coefficient). We can then find whether the coefficient is positive or negative and its absolute size and put this all together in a plot.
+
+```{r}
+titanic_fit %>%
+  tidy() %>%
+  mutate(
+    favors = ifelse(estimate > 0, "Transported", "Not Transported"),
+    abs_estimate = abs(estimate),
+    term = factor(term),
+    term = fct_reorder(term, abs_estimate),
+    significant = p.value < 0.05
+  ) %>%
+  ggplot() +
+  aes(
+    x = term,
+    y = abs_estimate,
+    fill = favors,
+    alpha = significant
+  ) +
+  geom_col() +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+  ) +
+  coord_flip() +
+  labs(
+    x = "Variable",
+    y = "Importance",
+    fill = "Favours",
+    caption = "Statistically insignifiant variables are shown semi-transparent"
+  ) +
+  scale_fill_brewer(
+    palette = "Set1"
+  ) +
+  scale_alpha_manual(
+    values = c(0.3, 1)
+  ) +
+  guides(
+    alpha = "none"
+  )
+```
+
+This is plot with a lot of layers that produces quite a sophisticated plot. Try changing some values or leacing some layers out to see how it affects the plot.
+
+## Train a More Complex Model
+
+To train a more complex model we are going to need to split our data into multiple folds so that we can try lots of hyperparameters and see which ones are best. We can automatically set up V-fold crossvalidation quite easily in `tidymodels`.
+
+```{r}
+data_folds <- vfold_cv(
+  data_train,
+  v = 5,
+  repeats = 3
+)
+```
+
+We can then specify a more complicated model. For this example I am going to create an elastic net regression model, this is an extension of linear/logistic regression (you can see I still call `logistic_reg`) but has two tunable parameters `alpha` and `lambda`. When we create our model specification, rather than setting a value for these two hyperparameters we can just set them equal to `tune()` which lets `tidymodels` know that we want to find the best values possible for them. The basic linear modelling package in R won't make elastic net models so we also set the engine for the model to `glmnet` which will. All this means is that `tidymodels` will use the `glmnet` package to make the model rather than the default package.
+
+```{r}
+elastic_net_spec <- logistic_reg(
+  penalty = tune(),
+  mixture = tune(),
+  engine = "glmnet"
+)
+```
+
+We can then create a model specification just like before.
+
+```{r}
+elastic_net_wf <- workflow() %>%
+  add_recipe(data_rec) %>%
+  add_model(elastic_net_spec)
+```
+
+Then we create a table of different combinations of hyperparameters to try.
+
+```{r}
+elastic_net_grid <- grid_regular(
+  penalty(),
+  mixture(),
+  levels = 10
+)
+```
+
+We then train a model with each combination of these hyperparameters using the folds created earlier.
+
+```{r}
+elastic_net_tuned <- tune_grid(
+  elastic_net_wf,
+  resamples = data_folds,
+  grid = elastic_net_grid
+)
+```
+
+We can then print out all of the validation metrics to see which model is performing the best.
+
+```{r}
+elastic_net_tuned %>%
+  collect_metrics()
+```
+
+We can also plot these metrics to explore them visually.
+
+```{r}
+elastic_net_tuned %>%
+  collect_metrics() %>%
+  mutate(
+    mixture = paste0("Mixture = ", mixture),
+    .metric = case_match(
+      .metric,
+      "accuracy" ~ "Accuracy",
+      "roc_auc" ~ "Area Under\nROC Curve"
+    )
+  ) %>%
+  ggplot() +
+  aes(
+    x = penalty,
+    y = mean
+  ) +
+  geom_point() +
+  scale_x_log10() +
+  facet_grid(
+    .metric ~ mixture,
+    scales = "free_y"
+  ) +
+  theme_bw()
+```
+
+We can use `tidymodels` to automatically extract the hyperparamenters that produced the best model (best according to our chosen metric).
+
+```{r} 
+highest_auc <- elastic_net_tuned %>%
+  select_best("roc_auc")
+
+highest_auc
+```
+
+Now that we know the best hyperparameter values, we can set our model to use those values.
+
+```{r}
+elastic_net_final <- finalize_workflow(
+  elastic_net_wf,
+  highest_auc
+)
+```
+
+Then we can train the model like normal.
+
+```{r}
+elastic_net_fit <- fit(
+  elastic_net_final,
+  data_train
+)
+```
+
+Then we can test it on our validation set to see how well the model performed.
+
+```{r}
+preds_train <- predict(
+  elastic_net_fit,
+  data_val
+)
+
+confusionMatrix(preds_train$.pred_class, data_val$Transported)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
