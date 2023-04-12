@@ -1,3 +1,5 @@
+# Mac Finder files
+*.DS_Store
 # Input data files
 *.csv
 
