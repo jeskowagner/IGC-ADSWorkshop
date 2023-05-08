@@ -1,0 +1,218 @@
+---
+output: reprex::reprex_document
+knit: reprex::reprex_render
+---
+
+# Section 1: (Re)introduction of dataset & preparation [Reminder]
+
+This work-along demonstrates how Parkinson's can be predicted from speech patterns using statistics and machine learning in Python.
+It uses [this](https://archive.ics.uci.edu/ml/datasets/parkinsons) dataset.
+The authors have kindly extract some information from spoken interviews of participants.
+
+If you have not worked with R Markdown documents before, take a look [here](https://rmarkdown.rstudio.com/articles_intro.html) for information on how to use them.
+Generally, you can click "Run Chunk" to run the lines between two ```{r} and ```. The output will be displayed in the terminal below.
+
+We will get started right away by loading in everything we will need for this tutorial.
+```{r}
+# Load in dependencies
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(skimr)
+library(corrr)
+
+# Load in data
+raw_data <- read_csv("./challenges/2023-05-12/parkinsons.csv")
+set.seed(2023) # Set seed for reproducibility
+```
+
+# Section 2: Exploratory Data Analysis [Reminder]
+To get a better understanding of the data, we will take a look at some summary statistics.
+One way of doing this is by using the `skim()` function from the `skimr` package.
+This will give us a nice overview of the data. Make sure to look at all the output.
+
+```{r}
+# View data
+skim(raw_data)
+```
+You can see that we have 23 columns and 195 rows. 
+Also, we have a few missing values, noted under "n_missing". 
+These will have to be tackled later.
+
+# Section 3: Train/Test split
+In machine learning, we often want to know how well our model performs on our data.
+But if we test a trained model on the same data it was trained on, our results will be biased:
+after all, the model has already seen the data it is being tested on.
+
+One of the ways to tackle this is to split your data into a training set and a test set.
+All decisions about the model are made on the training set, and the test set is exclusively used to evaluate the model in the end.
+
+In practice, this means that we often take, say, 80% of our observations for training, and 20% for testing.
+This could look like the following. Note: you will have to fill something in for the proportion of the split.
+You can find the function definition here: [here](https://rsample.tidymodels.org/reference/initial_split.html)
+
+```{r}
+# Convert outcome variable to factor
+raw_data <- raw_data %>%
+    mutate(status = as.factor(status))
+
+# Split the data 80/20 train/test
+train_test_split <- initial_split(raw_data, prop = <FILLMEIN>) # <- change prop to the correct fraction
+train <- training(train_test_split)
+test <- testing(train_test_split)
+
+print("Training data:")
+print(train)
+
+print("Test data:")
+print(test)
+```
+
+For the next sections, because we are still making choices about the data and model, we will only use the training data.
+We will come back to the test data later.
+
+# Section 4: Imputation
+Most types of models do not handle missing values well.
+Of course, the best solution would be to collect all data, but sometimes this may not be possible especially if there are patients involved.
+
+**Exercise**: imagine a table with 10 patients, containing data of patients whose blood glucose and blood pressure were measured.
+For one patient we do not have the blood glucose level.
+Based on speculation alone, how could you handle this missing case?
+
+Finished the Exercise above? Good! Here are some ways you may have thought of:
+1. Remove the patient from the dataset
+2. Remove the measurement with missing values from the dataset
+3. Calculate the average blood glucose level across the other patients and use that value for the missing patient
+4. More advanced: use a machine learning model to predict the missing value
+
+Let's have a look how we could implement these ideas.
+
+To do this, we can use tidymodels' recipe's. 
+This allows us to define a set of steps to be performed on the data before it is fed to the model.
+It is a very handy way to defining all the steps from your data to the finished model.
+For the first idea, removing all patients with missing value, an example recipe could look like this:
+
+```{r}
+# Idea 1: remove observations with missing values
+recipe_remove_missing_observation <- recipe(status ~ ., data = train) %>%
+    step_naomit(all_predictors())
+
+# Print the data after the recipe has been applied
+recipe_remove_missing_observation %>%
+    prep() %>%
+    juice() %>%
+    head()
+```
+
+For the second idea, removing the feature with missing values:
+```{r}
+# Idea 2: remove feature with missing values
+recipe_remove_missing_feature <- recipe(status ~ ., data = train) %>%
+    step_filter_missing(all_predictors(), threshold=0.01)
+
+# Print the data after the recipe has been applied
+recipe_remove_missing_feature %>%
+    prep() %>%
+    juice() %>%
+    head()
+```
+
+Third, calculating the average of the feature and using that value for the missing value:
+```{r}
+# Idea 3: impute missing values with average
+recipe_impute_average <- recipe(status ~ ., data = train) %>%
+    step_impute_mean(all_predictors())
+
+# Print the data after the recipe has been applied
+recipe_impute_average %>%
+    prep() %>%
+    juice() %>%
+    head()
+```
+
+Okay, now we have three datasets with missing values handled in different ways.
+Which one is best? Using the recipes built above, we can easily test this.
+The idea is that we can put our recipes in a workflow, and then use that workflow to fit a model.
+In other words, the recipe is everything we need to do to prepare the data.
+The workflow contains the recipe and the model, and is everything we need to do to get a prediction.
+Let's see what this could look like.
+```{r}
+# Create a workflow for each idea
+
+# Idea 1: remove observations with missing values
+workflow_remove_missing_observation <- workflow() %>%
+    add_recipe(recipe_remove_missing_observation) %>%
+    add_model(logistic_reg())
+   
+# Idea 2: remove feature with missing values 
+workflow_remove_missing_feature <- workflow() %>%
+    add_recipe(FILLMEIN) %>%
+    add_model(logistic_reg())
+
+# Idea 3: impute missing values with average
+workflow_impute_average <- workflow() %>%
+    add_recipe(FILLMEIN) %>%
+    add_model(logistic_reg())
+```
+
+Nice! We now have everything we need to go from data to model. 
+So let's compare our different imputation strategies at last (higher values are better):
+
+```{r}
+# Define custom function to fit and evaluate a model
+computemcc = function(workflow) {
+    mcc = workflow %>% 
+        fit(data = train) %>%            # Fit model
+        predict(new_data = test) %>%     # Predict on test data
+        bind_cols(test) %>%              # Add test data to predictions
+        mcc(truth = status, estimate = .pred_class) %>% # Calculate MCC
+        select(.estimate) %>%            # Select MCC
+        as.numeric() %>%                 # Convert to single number
+        round(digits = 3)                # Round to 3 digits
+    return(mcc)
+}
+
+
+mcc_remove_missing_observation = computemcc(workflow_remove_missing_observation)
+mcc_remove_missing_feature = computemcc(workflow_remove_missing_feature)
+mcc_impute_average = computemcc(workflow_impute_average)
+
+print(paste("MCC for removing observations with missing values: ", mcc_remove_missing_observation))
+print(paste("MCC for removing feature with missing values: ", mcc_remove_missing_feature))
+print(paste("MCC for imputing missing values with average: ", mcc_impute_average))
+```
+
+**Exercise**: does the result match your expectations? Why or why not?
+Brainstorm with your group about what could be done to improve the imputation strategies.
+
+Seeing that above our performance was best when we removed patients with missing values, let's continue with that strategy.
+```{r}
+workflow <- workflow_remove_missing_observation
+```
+
+# Section 5: Feature selection
+We can see that our predictions aren't perfect yet.
+One thing we can try is to cherry-pick some features and remove others.
+This process is called feature selection and often improves downstream performance.
+You can think of it as removing noise from the data: by removing surplus features,
+the model can focus on the features that are actually important.
+
+So, how do we select important features?
+There are a few different strategies, but to stay within time today we will focus on one: removing correlated features.
+
+Let's first look at correlations across our features:
+```{r}
+train %>%
+    correlate() %>%    # Compute Pearson correlation
+    shave() %>%        # Keep only lower triangle
+    rplot() +          # Create correlation plot
+    theme(axis.text.x = element_text(  # Rotate x-axis labels
+        angle = 90, hjust = 1, vjust=0.5
+        )) + 
+    scale_color_gradient2(low = "blue", 
+                          mid = "white", 
+                          high = "red", 
+                          midpoint = 0, limit = c(-1,1)) # Color scheme
+```
+
+# Section 6: 
