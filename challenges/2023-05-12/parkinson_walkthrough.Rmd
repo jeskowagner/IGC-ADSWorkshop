@@ -5,12 +5,18 @@ knit: reprex::reprex_render
 
 # Section 1: (Re)introduction of dataset & preparation [Reminder]
 
-This work-along demonstrates how Parkinson's can be predicted from speech patterns using statistics and machine learning in Python.
-It uses [this](https://archive.ics.uci.edu/ml/datasets/parkinsons) dataset.
+This work-along demonstrates how Parkinson's can be predicted from speech patterns
+using statistics and machine learning in R.
+
+It uses this (https://archive.ics.uci.edu/ml/datasets/parkinsons) dataset.
+
 The authors have kindly extract some information from spoken interviews of participants.
 
-If you have not worked with R Markdown documents before, take a look [here](https://rmarkdown.rstudio.com/articles_intro.html) for information on how to use them.
-Generally, you can click "Run Chunk" to run the lines between two ```{r} and ```. The output will be displayed in the terminal below.
+Disclaimer: If you have not worked with R Markdown documents before, take a look 
+here (https://rmarkdown.rstudio.com/articles_intro.html) for information on how to use them.
+
+Generally, you can click green arrow on the right to run the lines between two 
+```{r} and ```. The output will be displayed in the terminal below.
 
 We will get started right away by loading in everything we will need for this tutorial.
 ```{r}
@@ -22,34 +28,49 @@ library(skimr)
 library(corrr)
 
 # Load in data
-raw_data <- read_csv("./challenges/2023-05-12/parkinsons.csv")
+raw_data <- read_csv("parkinsons.csv")
 set.seed(2023) # Set seed for reproducibility
 ```
 
 # Section 2: Exploratory Data Analysis [Reminder]
 To get a better understanding of the data, we will take a look at some summary statistics.
+
 One way of doing this is by using the `skim()` function from the `skimr` package.
+
 This will give us a nice overview of the data. Make sure to look at all the output.
 
 ```{r}
 # View data
 skim(raw_data)
 ```
-You can see that we have 23 columns and 195 rows. 
-Also, we have a few missing values, noted under "n_missing". 
-These will have to be tackled later.
+You can see that we have 23 columns and 195 rows.
+
+Also, we have a few missing values, noted under "n_missing".
+
+These will be relevant later. But we will first address another point.
 
 # Section 3: Train/Test split
 In machine learning, we often want to know how well our model performs on our data.
+
 But if we test a trained model on the same data it was trained on, our results will be biased:
 after all, the model has already seen the data it is being tested on.
 
 One of the ways to tackle this is to split your data into a training set and a test set.
-All decisions about the model are made on the training set, and the test set is exclusively used to evaluate the model in the end.
 
-In practice, this means that we often take, say, 80% of our observations for training, and 20% for testing.
-This could look like the following. Note: you will have to fill something in for the proportion of the split.
-You can find the function definition here: [here](https://rsample.tidymodels.org/reference/initial_split.html)
+All decisions about the model are made on the training set, and the test set is
+exclusively used to evaluate the model in the end.
+
+In other words, we want to pause before starting with our analysis and set aside
+a portion of our data to test on later.
+
+In practice, this means that we often take, say, 80% of our observations for
+training, and 20% for testing.
+
+This could look like the following code. Note: you will have to fill something in for 
+the proportion of the split.
+
+Hint: you can find the function definition here:
+https://rsample.tidymodels.org/reference/initial_split.html
 
 ```{r}
 # Convert outcome variable to factor
@@ -57,27 +78,42 @@ raw_data <- raw_data %>%
     mutate(status = as.factor(status))
 
 # Split the data 80/20 train/test
-train_test_split <- initial_split(raw_data, prop = <FILLMEIN>) # <- change prop to the correct fraction
+train_test_split <- initial_split(raw_data, prop = 0.8) # <- change prop to the correct fraction
 train <- training(train_test_split)
 test <- testing(train_test_split)
 
 print("Training data:")
 print(train)
-
+```
+```{r}
 print("Test data:")
 print(test)
 ```
 
-For the next sections, because we are still making choices about the data and model, we will only use the training data.
+For the next sections, because we are still making choices about the data and model, 
+we will only use the training data.
+
 We will come back to the test data later.
 
 # Section 4: Imputation
-Most types of models do not handle missing values well.
-Of course, the best solution would be to collect all data, but sometimes this may not be possible especially if there are patients involved.
+Sometimes when collecting data, it is unfeasible to collect all data for all
+participants.
 
-**Exercise**: imagine a table with 10 patients, containing data of patients whose blood glucose and blood pressure were measured.
+----
+**Exercise**: imagine a table with 10 patients, containing data of patients whose
+blood glucose and blood pressure were measured.
+
 For one patient we do not have the blood glucose level.
-Based on speculation alone, how could you handle this missing case?
+
+Ultimately, we will need a dataset with no missing data to build our model.
+
+Speculate and discuss with your group how could you handle this missing case.
+----
+
+
+Of course, the best solution would be to collect all data, but sometimes this
+may not be possible especially if there are patients involved.
+
 
 Finished the Exercise above? Good! Here are some ways you may have thought of:
 1. Remove the patient from the dataset
