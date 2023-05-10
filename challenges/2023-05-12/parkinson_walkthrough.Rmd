@@ -5,20 +5,18 @@ knit: reprex::reprex_render
 
 # Section 1: (Re)introduction of dataset & preparation [Reminder]
 
-This work-along demonstrates how Parkinson's can be predicted from speech patterns
-using statistics and machine learning in R.
+This work-along demonstrates how Parkinson's can be predicted from speech patterns using statistics and machine learning in R.
 
-It uses this (https://archive.ics.uci.edu/ml/datasets/parkinsons) dataset.
+It uses this (<https://archive.ics.uci.edu/ml/datasets/parkinsons>) dataset.
 
 The authors have kindly extract some information from spoken interviews of participants.
 
-Disclaimer: If you have not worked with R Markdown documents before, take a look 
-here (https://rmarkdown.rstudio.com/articles_intro.html) for information on how to use them.
+Disclaimer: If you have not worked with R Markdown documents before, take a look here (<https://rmarkdown.rstudio.com/articles_intro.html>) for information on how to use them.
 
-Generally, you can click green arrow on the right to run the lines between triple-backticks.
-The output will be displayed in the terminal below.
+Generally, you can click green arrow on the right to run the lines between triple-backticks. The output will be displayed in the terminal below.
 
 We will get started right away by loading in everything we will need for this tutorial.
+
 ```{r}
 # Load in dependencies
 library(tidyverse)
@@ -33,6 +31,7 @@ set.seed(2023) # Set seed for reproducibility
 ```
 
 # Section 2: Exploratory Data Analysis [Reminder]
+
 To get a better understanding of the data, we will take a look at some summary statistics.
 
 One way of doing this is by using the `skim()` function from the `skimr` package.
@@ -43,6 +42,7 @@ This will give us a nice overview of the data. Make sure to look at all the outp
 # View data
 skim(raw_data)
 ```
+
 You can see that we have 23 columns and 195 rows.
 
 Also, we have a few missing values, noted under "n_missing".
@@ -50,27 +50,22 @@ Also, we have a few missing values, noted under "n_missing".
 These will be relevant later. But we will first address another point.
 
 # Section 3: Train/Test split
+
 In machine learning, we often want to know how well our model performs on our data.
 
-But if we test a trained model on the same data it was trained on, our results will be biased:
-after all, the model has already seen the data it is being tested on.
+But if we test a trained model on the same data it was trained on, our results will be biased: after all, the model has already seen the data it is being tested on.
 
 One of the ways to tackle this is to split your data into a training set and a test set.
 
-All decisions about the model are made on the training set, and the test set is
-exclusively used to evaluate the model in the end.
+All decisions about the model are made on the training set, and the test set is exclusively used to evaluate the model in the end.
 
-In other words, we want to pause before starting with our analysis and set aside
-a portion of our data to test on later.
+In other words, we want to pause before starting with our analysis and set aside a portion of our data to test on later.
 
-In practice, this means that we often take, say, 80% of our observations for
-training, and 20% for testing.
+In practice, this means that we often take, say, 80% of our observations for training, and 20% for testing.
 
-This could look like the following code. Note: you will have to fill something in for 
-the proportion of the split.
+This could look like the following code. Note: you will have to fill something in for the proportion of the split.
 
-Hint: you can find the function definition here:
-https://rsample.tidymodels.org/reference/initial_split.html
+Hint: you can find the function definition here: <https://rsample.tidymodels.org/reference/initial_split.html>
 
 ```{r}
 # Convert outcome variable to factor
@@ -93,42 +88,39 @@ print("Test data:")
 print(test)
 ```
 
-For the next sections, because we are still making choices about the data and model, 
-we will only use the training data.
+For the next sections, because we are still making choices about the data and model, we will only use the training data.
 
 We will come back to the test data later.
 
 # Section 4: Imputation
-Sometimes when collecting data, it is unfeasible to collect all data for all
-participants.
 
-----
-**Exercise**: imagine a table with 10 patients, containing data of patients whose
-blood glucose and blood pressure were measured.
+Sometimes when collecting data, it is unfeasible to collect all data for all participants.
+
+**Exercise**: imagine a table with 10 patients, containing data of patients whose blood glucose and blood pressure were measured.
 
 For one patient we do not have the blood glucose level.
 
 Ultimately, we will need a dataset with no missing data to build our model.
 
 Speculate and discuss with your group how could you handle this missing case.
-----
 
-
-Of course, the best solution would be to collect all data, but sometimes this
-may not be possible especially if there are patients involved.
-
+Of course, the best solution would be to collect all data, but sometimes this may not be possible especially if there are patients involved.
 
 Finished the Exercise above? Good! Here are some ways you may have thought of:
-1. Remove the patient from the dataset
-2. Remove the measurement with missing values from the dataset
-3. Calculate the average blood glucose level across the other patients and use that value for the missing patient
-4. More advanced: use a machine learning model to predict the missing value
+
+1.  Remove the patient from the dataset
+
+2.  Remove the measurement with missing values from the dataset
+
+3.  Calculate the average blood glucose level across the other patients and use that value for the missing patient
+
+4.  More advanced: use a machine learning model to predict the missing value
 
 All of them find use in real-world Science!
 
 Let's have a look how we could implement these ideas.
 
-To do this, we can use tidymodels' recipe's. 
+To do this, we can use tidymodels' recipes.
 
 This allows us to define a set of steps to be performed on the data before it is fed to the model.
 
@@ -147,10 +139,11 @@ recipe_remove_missing_observation %>%
     juice() %>%
     head()
 ```
-By looking at the output of the above code, we can see that all observations with
-missing values have been removed. Accordingly, we now have fewer rows.
+
+By looking at the output of the above code, we can see that all observations with missing values have been removed. Accordingly, we now have fewer rows.
 
 For the second idea, removing the feature with missing values:
+
 ```{r}
 # Idea 2: remove feature with missing values
 recipe_remove_missing_feature <- recipe(status ~ ., data = train) %>%
@@ -162,10 +155,11 @@ recipe_remove_missing_feature %>%
     juice() %>%
     head()
 ```
-By looking at the output of the above code, we can see that the feature with
-missing values has been removed. Accordingly, we now have fewer columns.
+
+By looking at the output of the above code, we can see that the feature with missing values has been removed. Accordingly, we now have fewer columns.
 
 Third, calculating the average of the feature and using that value for the missing value:
+
 ```{r}
 # Idea 3: impute missing values with average
 recipe_impute_average <- recipe(status ~ ., data = train) %>%
@@ -177,6 +171,7 @@ recipe_impute_average %>%
     juice() %>%
     head()
 ```
+
 Because we filled in the missing values, we maintained the numbers of rows and columns.
 
 Okay, now we have three datasets with missing values handled in different ways.
@@ -190,6 +185,7 @@ In other words, the recipe is everything we need to do to prepare the data.
 The workflow contains the recipe and the model, and is everything we need to do to get a prediction.
 
 Let's see what this could look like.
+
 ```{r}
 # Create a workflow for each idea
 
@@ -209,8 +205,7 @@ workflow_impute_average <- workflow() %>%
     add_model(logistic_reg())
 ```
 
-Nice! We now have everything we need to go from data to model. 
-So let's compare our different imputation strategies at last (higher values are better):
+Nice! We now have everything we need to go from data to model. So let's compare our different imputation strategies at last (higher values are better):
 
 ```{r}
 # Define custom function to fit and evaluate a model
@@ -236,32 +231,26 @@ print(paste("MCC for removing feature with missing values: ", mcc_remove_missing
 print(paste("MCC for imputing missing values with average: ", mcc_impute_average))
 ```
 
-----
 **Exercise**: does the result match your expectations? Why or why not?
 
 Brainstorm with your group about what could be done to improve the imputation strategies.
-----
-
-Seeing that above our performance was best when we removed patients with missing values, let's continue with that strategy.
-```{r}
-workflow <- workflow_remove_missing_observation
-```
 
 # Section 5: Feature selection
+
 We can see that our predictions aren't perfect yet.
 
 One thing we can try is to cherry-pick some features and remove others.
 
 This process is called feature selection and often improves downstream performance.
 
-You can think of it as removing noise from the data: by removing surplus features,
-the model can focus on the features that are actually important.
+You can think of it as removing noise from the data: by removing surplus features, the model can focus on the features that are actually important.
 
 So, how do we select important features?
 
 There are a few different strategies, but to stay within time today we will focus on one: removing correlated features.
 
 Let's first look at correlations across our features:
+
 ```{r}
 train %>%
     mutate(status = as.numeric(status)) %>% # Convert outcome variable to numeric for correlation
@@ -282,27 +271,20 @@ train %>%
     )
 ```
 
-----
-**Exercise**: remembering that the diagnosis (Parkinson's or healthy) is saved
-in the "status" column, which features correlate with the diagnosis?
+**Exercise**: remembering that the diagnosis (Parkinson's or healthy) is saved in the "status" column, which features correlate with the diagnosis?
 
 Conversely, which ones seems irrelevant?
 
 Which features have high correlation with each other?
-----
 
-Sometimes, removing features that provide similar information can improve
-model performance.
+Sometimes, removing features that provide similar information can improve model performance.
 
-The idea behind this is to remove noise from our measurements and focus on
-features that provide unique information.
+The idea behind this is to remove noise from our measurements and focus on features that provide unique information.
 
-Given the correlation plot we observed above, let's see how we could remove
-features that have high correlation to each other.
+Given the correlation plot we observed above, let's see how we could remove features that have high correlation to each other.
 
-Note: you will have to find the right function to use here.
-Have a look at https://recipes.tidymodels.org/reference/index.html#step-functions-filters
-To see which step might be the right one!
+Note: you will have to find the right function to use here. Have a look at <https://recipes.tidymodels.org/reference/index.html#step-functions-filters> To see which step might be the right one!
+
 ```{r}
 recipe_corr <- recipe_remove_missing_observation %>%
     step_FILLMEIN(all_predictors(), threshold=0.9) # <- Fill in the right function
@@ -315,6 +297,7 @@ recipe_corr %>%
 ```
 
 Did this improve our performance now? Let's check!
+
 ```{r}
 workflow_corr <- workflow() %>% # Define empty workflow
     add_recipe(recipe_corr) %>% # Add recipe created above
@@ -323,21 +306,20 @@ workflow_corr <- workflow() %>% # Define empty workflow
 mcc_corr <- computemcc(workflow_corr)
 print(paste("MCC after removing correlated features: ", mcc_corr))
 ```
-----
+
 **Exercise**: does the result match your expectations? Why or why not?
 
 Brainstorm with your group about what might have happened.
-----
 
 # Section 6: Cross-validation
+
 Earlier we used a train/test split to build a model and evaluate its performance on held-out data.
 
 However, what if the split we used was unlucky and we got a bad split?
 
 To make sure we use each data point at least once for training and testing (separately), we can use cross-validation.
 
-Cross-validation is a really useful method because it helps us figure out how well our model will do on new,
-unseen data, without getting too caught up in the specifics of the data we used to train it.
+Cross-validation is a really useful method because it helps us figure out how well our model will do on new, unseen data, without getting too caught up in the specifics of the data we used to train it.
 
 Plus, it helps us make sure our model isn't just memorizing the training data and isn't actually any good at generalizing to new examples.
 
@@ -345,7 +327,7 @@ Cross-validation splits the dataset into `k` equal-sized folds and trains the mo
 
 This process is repeated `k` times, each time using a different fold as the test set.
 
-The results from each fold are then averaged to obtain an overall estimate of model performance. 
+The results from each fold are then averaged to obtain an overall estimate of model performance.
 
 This allows us to obtain a more robust estimate of the model's generalization performance and reduce the risk of overfitting to the training data.
 
@@ -368,26 +350,27 @@ cv_res <- fit_resamples(
 You can ignore the warning this gives for now.
 
 Let's look at the result!
+
 ```{r}
 cv_res_coll = collect_metrics(cv_res)
 sprintf("Average MCC across five folds of cross-validation: %.3f +/- %.3f", 
         cv_res_coll$mean, 
         cv_res_coll$std_err)
 ```
-----
+
 **Exercise**: What does this result mean?
 
 Brainstorm with your group about how to interpret this number.
-----
 
 # Section 7: Model explainability (optional)
-Done already and still got time? Great! 
+
+Done already and still got time? Great!
 
 This section deals with model explainability, which can be used to understand why a model makes certain predictions.
 
 We will not provide a whole explanation for model explainability, because there are a plethora of great online resources, just give it a Google!
 
-I do want to point you to the interesting `DALEX` and `DALEXtra` packages, which can be used to explain models trained with `tidymodels`. 
+I do want to point you to the interesting `DALEX` and `DALEXtra` packages, which can be used to explain models trained with `tidymodels`.
 
 For example, see the approach below:
 
