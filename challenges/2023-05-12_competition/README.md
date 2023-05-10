@@ -22,3 +22,11 @@ That said, here are the columns we are using to predict whether a person does ex
 - smoking (binary)
 - diet (binary)
 - weight (continuous, no scale)
+
+Desired outcome: build a model on the data in `train.csv` and submit your predictions
+on `test.csv` to jesko.wagner@ed.ac.uk.
+Please only make a single submission per group!
+Highest MCC wins!
+
+
+Good luck.
