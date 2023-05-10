@@ -15,8 +15,8 @@ The authors have kindly extract some information from spoken interviews of parti
 Disclaimer: If you have not worked with R Markdown documents before, take a look 
 here (https://rmarkdown.rstudio.com/articles_intro.html) for information on how to use them.
 
-Generally, you can click green arrow on the right to run the lines between two 
-```{r} and ```. The output will be displayed in the terminal below.
+Generally, you can click green arrow on the right to run the lines between triple-backticks.
+The output will be displayed in the terminal below.
 
 We will get started right away by loading in everything we will need for this tutorial.
 ```{r}
@@ -78,13 +78,16 @@ raw_data <- raw_data %>%
     mutate(status = as.factor(status))
 
 # Split the data 80/20 train/test
-train_test_split <- initial_split(raw_data, prop = 0.8) # <- change prop to the correct fraction
+train_test_split <- initial_split(raw_data,
+                                  strata = status,
+                                  prop = <FILLMEIN>) # <- change prop to the correct fraction
 train <- training(train_test_split)
 test <- testing(train_test_split)
 
 print("Training data:")
 print(train)
 ```
+
 ```{r}
 print("Test data:")
 print(test)
@@ -121,11 +124,16 @@ Finished the Exercise above? Good! Here are some ways you may have thought of:
 3. Calculate the average blood glucose level across the other patients and use that value for the missing patient
 4. More advanced: use a machine learning model to predict the missing value
 
+All of them find use in real-world Science!
+
 Let's have a look how we could implement these ideas.
 
 To do this, we can use tidymodels' recipe's. 
+
 This allows us to define a set of steps to be performed on the data before it is fed to the model.
-It is a very handy way to defining all the steps from your data to the finished model.
+
+It is a very handy way of defining all the steps needed to preprocess your data.
+
 For the first idea, removing all patients with missing value, an example recipe could look like this:
 
 ```{r}
@@ -139,6 +147,8 @@ recipe_remove_missing_observation %>%
     juice() %>%
     head()
 ```
+By looking at the output of the above code, we can see that all observations with
+missing values have been removed. Accordingly, we now have fewer rows.
 
 For the second idea, removing the feature with missing values:
 ```{r}
@@ -152,6 +162,8 @@ recipe_remove_missing_feature %>%
     juice() %>%
     head()
 ```
+By looking at the output of the above code, we can see that the feature with
+missing values has been removed. Accordingly, we now have fewer columns.
 
 Third, calculating the average of the feature and using that value for the missing value:
 ```{r}
@@ -165,29 +177,35 @@ recipe_impute_average %>%
     juice() %>%
     head()
 ```
+Because we filled in the missing values, we maintained the numbers of rows and columns.
 
 Okay, now we have three datasets with missing values handled in different ways.
+
 Which one is best? Using the recipes built above, we can easily test this.
+
 The idea is that we can put our recipes in a workflow, and then use that workflow to fit a model.
+
 In other words, the recipe is everything we need to do to prepare the data.
+
 The workflow contains the recipe and the model, and is everything we need to do to get a prediction.
+
 Let's see what this could look like.
 ```{r}
 # Create a workflow for each idea
 
 # Idea 1: remove observations with missing values
-workflow_remove_missing_observation <- workflow() %>%
-    add_recipe(recipe_remove_missing_observation) %>%
-    add_model(logistic_reg())
+workflow_remove_missing_observation <- workflow() %>% # Define empty workflow
+    add_recipe(recipe_remove_missing_observation) %>% # Add recipe created above
+    add_model(logistic_reg())                         # Add logistic regression model
    
 # Idea 2: remove feature with missing values 
 workflow_remove_missing_feature <- workflow() %>%
-    add_recipe(FILLMEIN) %>%
+    add_recipe(<FILLMEIN>) %>%                          # <- Fill in this value!
     add_model(logistic_reg())
 
 # Idea 3: impute missing values with average
 workflow_impute_average <- workflow() %>%
-    add_recipe(FILLMEIN) %>%
+    add_recipe(<FILLMEIN>) %>%                          # <- Fill in this value!
     add_model(logistic_reg())
 ```
 
@@ -218,8 +236,11 @@ print(paste("MCC for removing feature with missing values: ", mcc_remove_missing
 print(paste("MCC for imputing missing values with average: ", mcc_impute_average))
 ```
 
+----
 **Exercise**: does the result match your expectations? Why or why not?
+
 Brainstorm with your group about what could be done to improve the imputation strategies.
+----
 
 Seeing that above our performance was best when we removed patients with missing values, let's continue with that strategy.
 ```{r}
@@ -228,27 +249,156 @@ workflow <- workflow_remove_missing_observation
 
 # Section 5: Feature selection
 We can see that our predictions aren't perfect yet.
+
 One thing we can try is to cherry-pick some features and remove others.
+
 This process is called feature selection and often improves downstream performance.
+
 You can think of it as removing noise from the data: by removing surplus features,
 the model can focus on the features that are actually important.
 
 So, how do we select important features?
+
 There are a few different strategies, but to stay within time today we will focus on one: removing correlated features.
 
 Let's first look at correlations across our features:
 ```{r}
 train %>%
-    correlate() %>%    # Compute Pearson correlation
-    shave() %>%        # Keep only lower triangle
-    rplot() +          # Create correlation plot
-    theme(axis.text.x = element_text(  # Rotate x-axis labels
-        angle = 90, hjust = 1, vjust=0.5
-        )) + 
-    scale_color_gradient2(low = "blue", 
-                          mid = "white", 
-                          high = "red", 
-                          midpoint = 0, limit = c(-1,1)) # Color scheme
+    mutate(status = as.numeric(status)) %>% # Convert outcome variable to numeric for correlation
+    correlate() %>%                         # Compute Pearson correlation
+    rplot() +                               # Create correlation plot
+    theme(
+            axis.text.x = element_text(     # Rotate x-axis labels
+                angle = -90, 
+                hjust = 0, 
+                vjust = 0.5)
+        ) + 
+    scale_color_gradient2(                  # Color scheme
+        low = "blue",   
+        mid = "white", 
+        high = "red", 
+        midpoint = 0, limit = c(-1,1),
+        name="Pearson correlation"
+    )
 ```
 
-# Section 6: 
+----
+**Exercise**: remembering that the diagnosis (Parkinson's or healthy) is saved
+in the "status" column, which features correlate with the diagnosis?
+
+Conversely, which ones seems irrelevant?
+
+Which features have high correlation with each other?
+----
+
+Sometimes, removing features that provide similar information can improve
+model performance.
+
+The idea behind this is to remove noise from our measurements and focus on
+features that provide unique information.
+
+Given the correlation plot we observed above, let's see how we could remove
+features that have high correlation to each other.
+
+Note: you will have to find the right function to use here.
+Have a look at https://recipes.tidymodels.org/reference/index.html#step-functions-filters
+To see which step might be the right one!
+```{r}
+recipe_corr <- recipe_remove_missing_observation %>%
+    step_FILLMEIN(all_predictors(), threshold=0.9) # <- Fill in the right function
+
+# Print the data after the recipe has been applied
+recipe_corr %>%
+    prep() %>%
+    juice() %>%
+    head()
+```
+
+Did this improve our performance now? Let's check!
+```{r}
+workflow_corr <- workflow() %>% # Define empty workflow
+    add_recipe(recipe_corr) %>% # Add recipe created above
+    add_model(logistic_reg()) 
+    
+mcc_corr <- computemcc(workflow_corr)
+print(paste("MCC after removing correlated features: ", mcc_corr))
+```
+----
+**Exercise**: does the result match your expectations? Why or why not?
+
+Brainstorm with your group about what might have happened.
+----
+
+# Section 6: Cross-validation
+Earlier we used a train/test split to build a model and evaluate its performance on held-out data.
+
+However, what if the split we used was unlucky and we got a bad split?
+
+To make sure we use each data point at least once for training and testing (separately), we can use cross-validation.
+
+Cross-validation is a really useful method because it helps us figure out how well our model will do on new,
+unseen data, without getting too caught up in the specifics of the data we used to train it.
+
+Plus, it helps us make sure our model isn't just memorizing the training data and isn't actually any good at generalizing to new examples.
+
+Cross-validation splits the dataset into `k` equal-sized folds and trains the model on `k`-1 folds while using the remaining fold as a test set.
+
+This process is repeated `k` times, each time using a different fold as the test set.
+
+The results from each fold are then averaged to obtain an overall estimate of model performance. 
+
+This allows us to obtain a more robust estimate of the model's generalization performance and reduce the risk of overfitting to the training data.
+
+For a graphical representation, see [here](https://uk.mathworks.com/discovery/cross-validation/_jcr_content/mainParsys/image.adapt.full.medium.jpg/1676051579549.jpg).
+
+What does that look like in practice?
+
+```{r}
+# Prepare CV
+cv_folds <- vfold_cv(raw_data, v = 5) # v stands for the number of folders, k in the text above
+
+# Execute CV
+cv_res <- fit_resamples(              
+  workflow_remove_missing_observation, # Feel free to use the other workflow too!
+  cv_folds,                            # CV folds creatd above
+  metrics = metric_set(mcc)            # Use MCC as metric
+)
+```
+
+You can ignore the warning this gives for now.
+
+Let's look at the result!
+```{r}
+cv_res_coll = collect_metrics(cv_res)
+sprintf("Average MCC across five folds of cross-validation: %.3f +/- %.3f", 
+        cv_res_coll$mean, 
+        cv_res_coll$std_err)
+```
+----
+**Exercise**: What does this result mean?
+
+Brainstorm with your group about how to interpret this number.
+----
+
+# Section 7: Model explainability (optional)
+Done already and still got time? Great! 
+
+This section deals with model explainability, which can be used to understand why a model makes certain predictions.
+
+We will not provide a whole explanation for model explainability, because there are a plethora of great online resources, just give it a Google!
+
+I do want to point you to the interesting `DALEX` and `DALEXtra` packages, which can be used to explain models trained with `tidymodels`. 
+
+For example, see the approach below:
+
+```{r}
+library(DALEXtra)
+library(DALEX)
+workflow_remove_missing_observation %>%
+    fit(train) %>%
+    explain_tidymodels(data = select(train, -status), y = as.numeric(train$status)) %>%
+    variable_importance() %>%
+    plot()
+```
+
+For information about what you are seeing and more, see [here](https://uc-r.github.io/dalex).
