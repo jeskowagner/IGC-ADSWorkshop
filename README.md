@@ -12,7 +12,6 @@ The aims of this workshop series are to
 
 ## Challenges
 The challenges we tackle should have a biological background and narrow scope.
-We will present some possible challenges during the first workshop on the 14th of April and you get to choose what to tackle!
 
 Sources for challenges may be [Kaggle](https://www.kaggle.com/), [DREAM](https://dreamchallenges.org/),
 or any other source that our community would benefit from. 
