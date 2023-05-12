@@ -40,4 +40,5 @@ If you would like to get involved or have any questions please send [us an email
 
 ## Workshops
 Month 1: etherpad.wikimedia.org/p/ADS-workshop
+
 Month 2: https://pad.carpentries.org/2023-05-12_ADS_workshop
