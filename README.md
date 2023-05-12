@@ -36,3 +36,10 @@ Let us know! We are happy to adjust the content accordingly.
 ## Contact
 The organising committee consists of Jesko Wagner, Emma Yang and Richard Kettle.
 If you would like to get involved or have any questions please send [us an email](mailto:jesko.wagner@ed.ac.uk,emma.yang@ed.ac.uk,r.f.kettle@sms.ed.ac.uk)! 
+
+
+## Workshops
+Month 1: etherpad.wikimedia.org/p/ADS-workshop
+Month 2: https://pad.carpentries.org/2023-05-12_ADS_workshop
+
+
