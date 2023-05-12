@@ -12,9 +12,9 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE,
-  message = FALSE,
-  warning = FALSE
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE
 )
 ```
 
@@ -36,7 +36,7 @@ We can start by loading in the data
 set.seed(123)
 library(tidyverse)
 
-raw_data <- read_csv("./Data/00_Raw_Data/train.csv")
+raw_data <- read_csv("data/train.csv")
 
 head(raw_data)
 ```
@@ -53,10 +53,10 @@ In this data set we are trying to predict the variable `Transported`. It's impor
 
 ```{r message = FALSE}
 raw_data %>%
-  group_by(Transported) %>%
-  summarise(
-    Count = n()
-  )
+    group_by(Transported) %>%
+    summarise(
+        Count = n()
+    )
 ```
 
 Now we can start looking at transforming our data ready for machine learning. There are two ways of doing this, manually transforming it or creating a data preprocessing object to attach to the model. A data preprocessing object will take the data that you are passing into the model and automatically tranform it into the correct form for the model. This is good because it means you only need to write this proprocessing object once and it will automatically transform any new data you give your model, you can also deploy your model with this preprocessing object attached meaning other people don't have to preprocess their data into the same form before using it, making it easier to share. The downside is that these preprocessing objects can be hard to code, `tidymodels` makes it much easier but it can still be a bit fiddly. In this walkthrough we use a combination of both methods.
@@ -65,9 +65,10 @@ The first variable that we are going to tackle is `Cabin` this is made up of the
 
 ```{r message = FALSE}
 data_proc <- raw_data %>%
-  separate(
-    Cabin, into = c("Deck", "Num", "Side"), sep = "/"
-  )
+    separate(
+        Cabin,
+        into = c("Deck", "Num", "Side"), sep = "/"
+    )
 
 data_proc
 ```
@@ -76,17 +77,17 @@ We can then take all of the non-numeric variables and convert them into the corr
 
 ```{r message=FALSE}
 data_proc <- data_proc %>%
-  mutate(
-    Transported = ifelse(Transported, "Transported", "Not Transported"),
-    Transported = factor(Transported, levels = c("Transported", "Not Transported")),
-    VIP = factor(VIP),
-    CryoSleep = factor(CryoSleep),
-    HomePlanet = factor(HomePlanet),
-    Deck = factor(Deck),
-    Num = as.numeric(Num),
-    Side = factor(Side),
-    Destination = factor(Destination)
-  )
+    mutate(
+        Transported = ifelse(Transported, "Transported", "Not Transported"),
+        Transported = factor(Transported, levels = c("Transported", "Not Transported")),
+        VIP = factor(VIP),
+        CryoSleep = factor(CryoSleep),
+        HomePlanet = factor(HomePlanet),
+        Deck = factor(Deck),
+        Num = as.numeric(Num),
+        Side = factor(Side),
+        Destination = factor(Destination)
+    )
 
 data_proc
 ```
@@ -95,66 +96,66 @@ You should spend a **very very very long time** performing exploratory data anal
 
 ```{r}
 data_proc %>%
-  select_if(function(col) is.numeric(col)) %>%
-  pivot_longer(
-    cols = 1:ncol(.),
-    names_to = "variable",
-    values_to = "value"
-  ) %>%
-  ggplot() +
-  aes(
-    x = value
-  ) +
-  geom_histogram() +
-  facet_wrap(
-    ~ variable,
-    scales = "free"
-  ) +
-  scale_y_continuous(
-    trans = scales::log1p_trans()
-  ) +
-  theme_bw()
+    select_if(function(col) is.numeric(col)) %>%
+    pivot_longer(
+        cols = 1:ncol(.),
+        names_to = "variable",
+        values_to = "value"
+    ) %>%
+    ggplot() +
+    aes(
+        x = value
+    ) +
+    geom_histogram() +
+    facet_wrap(
+        ~variable,
+        scales = "free"
+    ) +
+    scale_y_continuous(
+        trans = scales::log1p_trans()
+    ) +
+    theme_bw()
 ```
 
 I then do the same thing but `log1p` transform all of the numeric variables. The `log1p` transform is like the normal `log` function except you add one to the number before logging it. This avoids problems with trying to log 0 which ends in undefined values.
 
 ```{r}
 data_proc %>%
-  select_if(function(col) is.numeric(col)) %>%
-  pivot_longer(
-    cols = 1:ncol(.),
-    names_to = "variable",
-    values_to = "value"
-  ) %>%
-  ggplot() +
-  aes(
-    x = value
-  ) +
-  geom_histogram() +
-  facet_wrap(
-    ~ variable,
-    scales = "free"
-  ) +
-  scale_y_continuous(
-    trans = scales::log1p_trans()
-  ) +
-  scale_x_continuous(
-    trans = scales::log1p_trans()
-  ) +
-  theme_bw()
+    select_if(function(col) is.numeric(col)) %>%
+    pivot_longer(
+        cols = 1:ncol(.),
+        names_to = "variable",
+        values_to = "value"
+    ) %>%
+    ggplot() +
+    aes(
+        x = value
+    ) +
+    geom_histogram() +
+    facet_wrap(
+        ~variable,
+        scales = "free"
+    ) +
+    scale_y_continuous(
+        trans = scales::log1p_trans()
+    ) +
+    scale_x_continuous(
+        trans = scales::log1p_trans()
+    ) +
+    theme_bw()
 ```
 
 You can see that `Age` and `Num` are more evenly balanced in the original data, but the rest are more evenly balanced in the logged data. Therefore, all numeric variables are logged except `Age` and `Num`.
 
 ```{r}
 data_proc <- data_proc %>%
-  mutate(
-    RoomService = log1p(RoomService),
-    FoodCourt = log1p(FoodCourt),
-    ShoppingMall = log1p(FoodCourt),
-    Spa = log1p(Spa),
-    VRDeck = log1p(VRDeck)
-  )
+    mutate(
+        RoomService = log1p(RoomService),
+        FoodCourt = log1p(FoodCourt),
+        ShoppingMall = log1p(FoodCourt),
+        Spa = log1p(Spa),
+        VRDeck = log1p(VRDeck)
+    )
 ```
 
 Finally another consideration is whether there are any variables that are correlated with each other. We can do this using the `ggpairs` function from the `GGally` package. 
@@ -162,20 +163,20 @@ Finally another consideration is whether there are any variables that are correl
 ```{r message=FALSE, warning=FALSE}
 library(GGally)
 data_proc %>%
-  select_if(function(col) is.numeric(col)) %>%
-  ggpairs() +
-  theme_bw()
+    select_if(function(col) is.numeric(col)) %>%
+    ggpairs() +
+    theme_bw()
 ```
 
 Here we can see `FoodCourt` and `ShoppingMall` are directly correlated and so one can be removed, increasing the power of the model whilst not losing any predictive power. We also can remove other variables that are not going to be used by the model.
 
 ```{r}
 data_proc <- data_proc %>%
-  select(
-    -FoodCourt,
-    -PassengerId,
-    -Name
-  )
+    select(
+        -FoodCourt,
+        -PassengerId,
+        -Name
+    )
 ```
 
 We have loaded our training set and we also have a testing set in the `test.csv`. However, our testing data set doesn't have any ground truth values for us to estimate how well our model will perform on unseen data. Due to this, we can create a validation set and use this like a test set to estimate our model's performance. You would use this same code (just naming your variables differently) to do a typical test/train split. We use the `strata = Transported` argument to make the proportion of people Transported the same in the training and validation sets.
@@ -206,13 +207,15 @@ I then use the `prep` and `juice` functions to print out an example of the trans
 
 ```{r}
 data_rec <- recipe(Transported ~ ., data = data_train) %>%
-  step_nzv(all_predictors()) %>%
-  step_center(all_numeric_predictors()) %>%
-  step_scale(all_numeric_predictors()) %>%
-  step_impute_knn(all_predictors())  %>%
-  step_dummy(all_factor_predictors())
+    step_nzv(all_predictors()) %>%
+    step_center(all_numeric_predictors()) %>%
+    step_scale(all_numeric_predictors()) %>%
+    step_impute_knn(all_predictors()) %>%
+    step_dummy(all_factor_predictors())
 
-data_rec %>% prep() %>% juice()
+data_rec %>%
+    prep() %>%
+    juice()
 ```
 
 ## Train a Model
@@ -223,16 +226,16 @@ Firstly, we aren't going to just be creating a model, we are going to be creatin
 
 ```{r message = FALSE, warning=FALSE}
 titanic_workflow <- workflow() %>%
-  add_recipe(data_rec) %>%
-  add_model(logistic_reg())
+    add_recipe(data_rec) %>%
+    add_model(logistic_reg())
 ```
 
 We can then fit the model using the `fit` function.
 
 ```{r}
 titanic_fit <- fit(
-  titanic_workflow,
-  data_train
+    titanic_workflow,
+    data_train
 )
 ```
 
@@ -250,33 +253,34 @@ confusionMatrix(preds_train$.pred_class, data_val$Transported)
 To create predictions for our test set we can load it into R, perform the same transformations that we performed to our training data and then pass it through our model.
 
 ```{r}
-data_test <- read_csv("./Data/00_Raw_Data/test.csv")
+data_test <- read_csv("data/test.csv")
 
 data_test_proc <- data_test %>%
-  separate(
-    Cabin, into = c("Deck", "Num", "Side"), sep = "/"
-  ) %>%
-  mutate(
-    VIP = factor(VIP),
-    CryoSleep = factor(CryoSleep),
-    HomePlanet = factor(HomePlanet),
-    Deck = factor(Deck),
-    Num = as.numeric(Num),
-    Side = factor(Side),
-    Destination = factor(Destination)
-  ) %>%
-  mutate(
-    RoomService = log1p(RoomService),
-    FoodCourt = log1p(FoodCourt),
-    ShoppingMall = log1p(FoodCourt),
-    Spa = log1p(Spa),
-    VRDeck = log1p(VRDeck)
-  ) %>%
-  select(
-    -FoodCourt,
-    -PassengerId,
-    -Name
-  )
+    separate(
+        Cabin,
+        into = c("Deck", "Num", "Side"), sep = "/"
+    ) %>%
+    mutate(
+        VIP = factor(VIP),
+        CryoSleep = factor(CryoSleep),
+        HomePlanet = factor(HomePlanet),
+        Deck = factor(Deck),
+        Num = as.numeric(Num),
+        Side = factor(Side),
+        Destination = factor(Destination)
+    ) %>%
+    mutate(
+        RoomService = log1p(RoomService),
+        FoodCourt = log1p(FoodCourt),
+        ShoppingMall = log1p(FoodCourt),
+        Spa = log1p(Spa),
+        VRDeck = log1p(VRDeck)
+    ) %>%
+    select(
+        -FoodCourt,
+        -PassengerId,
+        -Name
+    )
 
 preds_test <- predict(titanic_fit, data_test_proc)
 head(preds_test$.pred_class, 20)
@@ -286,12 +290,12 @@ We can then transform this into a form that can be uploaded to Kaggle.
 
 ```{r}
 kaggle_submission <- tibble(
-  PassengerId = data_test$PassengerId,
-  Transported = preds_test$.pred_class
+    PassengerId = data_test$PassengerId,
+    Transported = preds_test$.pred_class
 ) %>%
-  mutate(
-    Transported = ifelse(Transported == "Transported", "True", "False")
-  )
+    mutate(
+        Transported = ifelse(Transported == "Transported", "True", "False")
+    )
 
 kaggle_submission
 ```
@@ -314,42 +318,42 @@ The coefficients can be extracted from the model using `titanic_fit %>% tidy()` 
 
 ```{r}
 titanic_fit %>%
-  tidy() %>%
-  mutate(
-    favors = ifelse(estimate > 0, "Transported", "Not Transported"),
-    abs_estimate = abs(estimate),
-    term = factor(term),
-    term = fct_reorder(term, abs_estimate),
-    significant = p.value < 0.05
-  ) %>%
-  ggplot() +
-  aes(
-    x = term,
-    y = abs_estimate,
-    fill = favors,
-    alpha = significant
-  ) +
-  geom_col() +
-  theme_bw() +
-  theme(
-    legend.position = "bottom"
-  ) +
-  coord_flip() +
-  labs(
-    x = "Variable",
-    y = "Importance",
-    fill = "Favours",
-    caption = "Statistically insignifiant variables are shown semi-transparent"
-  ) +
-  scale_fill_brewer(
-    palette = "Set1"
-  ) +
-  scale_alpha_manual(
-    values = c(0.3, 1)
-  ) +
-  guides(
-    alpha = "none"
-  )
+    tidy() %>%
+    mutate(
+        favors = ifelse(estimate > 0, "Transported", "Not Transported"),
+        abs_estimate = abs(estimate),
+        term = factor(term),
+        term = fct_reorder(term, abs_estimate),
+        significant = p.value < 0.05
+    ) %>%
+    ggplot() +
+    aes(
+        x = term,
+        y = abs_estimate,
+        fill = favors,
+        alpha = significant
+    ) +
+    geom_col() +
+    theme_bw() +
+    theme(
+        legend.position = "bottom"
+    ) +
+    coord_flip() +
+    labs(
+        x = "Variable",
+        y = "Importance",
+        fill = "Favours",
+        caption = "Statistically insignifiant variables are shown semi-transparent"
+    ) +
+    scale_fill_brewer(
+        palette = "Set1"
+    ) +
+    scale_alpha_manual(
+        values = c(0.3, 1)
+    ) +
+    guides(
+        alpha = "none"
+    )
 ```
 
 This is plot with a lot of layers that produces quite a sophisticated plot. Try changing some values or leacing some layers out to see how it affects the plot.
@@ -360,9 +364,9 @@ To train a more complex model we are going to need to split our data into multip
 
 ```{r}
 data_folds <- vfold_cv(
-  data_train,
-  v = 5,
-  repeats = 3
+    data_train,
+    v = 5,
+    repeats = 3
 )
 ```
 
@@ -370,9 +374,9 @@ We can then specify a more complicated model. For this example I am going to cre
 
 ```{r}
 elastic_net_spec <- logistic_reg(
-  penalty = tune(),
-  mixture = tune(),
-  engine = "glmnet"
+    penalty = tune(),
+    mixture = tune(),
+    engine = "glmnet"
 )
 ```
 
@@ -380,17 +384,17 @@ We can then create a model specification just like before.
 
 ```{r}
 elastic_net_wf <- workflow() %>%
-  add_recipe(data_rec) %>%
-  add_model(elastic_net_spec)
+    add_recipe(data_rec) %>%
+    add_model(elastic_net_spec)
 ```
 
 Then we create a table of different combinations of hyperparameters to try.
 
 ```{r}
 elastic_net_grid <- grid_regular(
-  penalty(),
-  mixture(),
-  levels = 10
+    penalty(),
+    mixture(),
+    levels = 10
 )
 ```
 
@@ -398,9 +402,9 @@ We then train a model with each combination of these hyperparameters using the f
 
 ```{r}
 elastic_net_tuned <- tune_grid(
-  elastic_net_wf,
-  resamples = data_folds,
-  grid = elastic_net_grid
+    elastic_net_wf,
+    resamples = data_folds,
+    grid = elastic_net_grid
 )
 ```
 
@@ -408,41 +412,41 @@ We can then print out all of the validation metrics to see which model is perfor
 
 ```{r}
 elastic_net_tuned %>%
-  collect_metrics()
+    collect_metrics()
 ```
 
 We can also plot these metrics to explore them visually.
 
 ```{r}
 elastic_net_tuned %>%
-  collect_metrics() %>%
-  mutate(
-    mixture = paste0("Mixture = ", mixture),
-    .metric = case_match(
-      .metric,
-      "accuracy" ~ "Accuracy",
-      "roc_auc" ~ "Area Under\nROC Curve"
-    )
-  ) %>%
-  ggplot() +
-  aes(
-    x = penalty,
-    y = mean
-  ) +
-  geom_point() +
-  scale_x_log10() +
-  facet_grid(
-    .metric ~ mixture,
-    scales = "free_y"
-  ) +
-  theme_bw()
+    collect_metrics() %>%
+    mutate(
+        mixture = paste0("Mixture = ", mixture),
+        .metric = case_match(
+            .metric,
+            "accuracy" ~ "Accuracy",
+            "roc_auc" ~ "Area Under\nROC Curve"
+        )
+    ) %>%
+    ggplot() +
+    aes(
+        x = penalty,
+        y = mean
+    ) +
+    geom_point() +
+    scale_x_log10() +
+    facet_grid(
+        .metric ~ mixture,
+        scales = "free_y"
+    ) +
+    theme_bw()
 ```
 
 We can use `tidymodels` to automatically extract the hyperparamenters that produced the best model (best according to our chosen metric).
 
 ```{r} 
 highest_auc <- elastic_net_tuned %>%
-  select_best("roc_auc")
+    select_best("roc_auc")
 
 highest_auc
 ```
@@ -451,8 +455,8 @@ Now that we know the best hyperparameter values, we can set our model to use tho
 
 ```{r}
 elastic_net_final <- finalize_workflow(
-  elastic_net_wf,
-  highest_auc
+    elastic_net_wf,
+    highest_auc
 )
 ```
 
@@ -460,8 +464,8 @@ Then we can train the model like normal.
 
 ```{r}
 elastic_net_fit <- fit(
-  elastic_net_final,
-  data_train
+    elastic_net_final,
+    data_train
 )
 ```
 
@@ -469,8 +473,8 @@ Then we can test it on our validation set to see how well the model performed.
 
 ```{r}
 preds_train <- predict(
-  elastic_net_fit,
-  data_val
+    elastic_net_fit,
+    data_val
 )
 
 confusionMatrix(preds_train$.pred_class, data_val$Transported)
